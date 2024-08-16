@@ -1,0 +1,13 @@
+---
+- name: Deploy Apache on RedHat-based hosts like Fedora
+  dnf:
+    name: httpd
+    state: present
+  when: ansible_os_family == 'RedHat'
+ 
+- name: Start Apache on RedHat-based hosts like Fedora
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+  when: ansible_os_family == 'RedHat'

@@ -1,0 +1,62 @@
+---
+- name: Deploy vsftpd FTP Server on Ubuntu hosts
+  hosts: ubuntu
+  become: yes
+  become_method: sudo
+
+  tasks:
+    - name: Update apt repository cache, if necessary
+      apt: 
+        update_cache: yes 
+        cache_valid_time: 3600
+
+    - name: Install vsftpd
+      apt:
+        name: vsftpd
+        state: present
+
+    - name: Backup original vsftpd.conf
+      copy:
+        src: /etc/vsftpd.conf
+        dest: /etc/vsftpd.conf.bak
+        remote_src: yes
+
+    - name: Configure vsftpd to allow user uploads and anonymous FTP access
+      lineinfile:
+        path: /etc/vsftpd.conf
+        regexp: '^#?(write_enable|anonymous_enable|local_enable|anon_upload_enable|anon_mkdir_write_enable)=.*'
+        line: "{{ item }}"
+        state: present
+      with_items:
+        - 'write_enable=YES'
+        - 'anonymous_enable=YES'
+        - 'local_enable=YES'
+        - 'anon_upload_enable=YES'
+        - 'anon_mkdir_write_enable=YES'
+      notify:
+        - restart vsftpd
+
+    - name: Ensure /srv/ftp directory exists
+      file:
+        path: /srv/ftp
+        state: directory
+        owner: ftp
+        group: ftp
+        mode: '0755'
+
+    - name: Create README.txt in /srv/ftp
+      copy:
+        content: "Welcome to the FTP server. This is a read-only file."
+        dest: /srv/ftp/README.txt
+        owner: ftp
+        group: ftp
+        mode: '0444'
+
+  handlers:
+    - name: restart vsftpd
+      service:
+        name: vsftpd
+        state: restarted
+
+  vars_files:
+  - vars/linuxsecrets.yml

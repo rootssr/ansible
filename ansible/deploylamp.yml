@@ -1,0 +1,86 @@
+---
+- name: Deploy LAMP on Ubuntu hosts
+  hosts: ubuntu
+  become: yes
+  become_method: sudo
+
+  vars:
+    users: []  # Define a variable to hold the list of user names
+
+  pre_tasks:
+    - name: Update apt repository cache, if necessary
+      apt: 
+        update_cache: yes 
+        cache_valid_time: 3600
+
+  handlers:
+    - name: restart apache
+      service: 
+        name: apache2 
+        state: restarted
+
+  tasks:
+    - name: Install LAMP packages
+      apt:
+        state: present
+        name:
+          - apache2
+          - mariadb-server
+          - mariadb-client
+          - php
+
+    - name: Disable the firewall
+      service: 
+        name: ufw 
+        state: stopped
+
+    - name: Start Apache and MariaDB
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      with_items:
+        - apache2
+        - mariadb
+
+    - name: Enable Apache userdir module for home directory hosting
+      apache2_module: 
+        name: userdir 
+        state: present
+      notify: restart apache
+
+    - name: Create multiple users
+      user:
+        name: "{{ item }}"
+        state: present
+        createhome: yes
+      with_items: "{{ users }}"
+
+    - name: Change permissions on /home/{{ item }} to 755
+      file:
+        path: "/home/{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items: "{{ users }}"
+
+    - name: Create /home/{{ item }}/public_html subdirectory
+      file:
+        path: "/home/{{ item }}/public_html"
+        state: directory
+        mode: '0755'
+        owner: "{{ item }}"
+        group: "{{ item }}"
+      with_items: "{{ users }}"
+
+    - name: Upload a sample index.html to /home/{{ item }}/public_html
+      copy:
+        src: index.html
+        dest: "/home/{{ item }}/public_html/index.html"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0644'
+      with_items: "{{ users }}"
+
+
+  vars_files:
+  - vars/linuxsecrets.yml
